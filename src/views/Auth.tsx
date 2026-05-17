@@ -47,7 +47,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         localStorage.setItem('kasir_users', JSON.stringify(users));
         onLogin(newUser);
       }
-    }, 1000);
+    }, 600);
   };
 
   return (

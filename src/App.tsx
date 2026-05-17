@@ -38,6 +38,7 @@ export default function App() {
   const handleLogin = (userData: any) => {
     setUser(userData);
     localStorage.setItem('kasir_session', JSON.stringify(userData));
+    setCurrentView('dashboard');
   };
 
   const handleLogout = () => {
