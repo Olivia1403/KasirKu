@@ -2,5 +2,5 @@
   "name": "KasirKu",
   "description": "SaaS POS digital modern untuk UMKM Indonesia. Kelola transaksi, stok, dan laporan bisnis secara otomatis dan real-time.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -8,7 +8,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { Product, Transaction, ViewType } from './types';
 import { INITIAL_PRODUCTS } from './constants';
-import { Menu, Loader2 } from 'lucide-react';
+import { Menu, Loader2, Store } from 'lucide-react';
 
 // Views
 import { Dashboard } from './views/Dashboard';
