@@ -7,7 +7,8 @@ import {
   Settings,
   Store,
   Menu,
-  X 
+  X,
+  LogOut
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { ViewType } from '@/src/types';
@@ -17,13 +18,17 @@ interface SidebarProps {
   onViewChange: (view: ViewType) => void;
   isOpen: boolean;
   onToggle: () => void;
+  onLogout: () => void;
+  user: any;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
   currentView, 
   onViewChange, 
   isOpen, 
-  onToggle 
+  onToggle,
+  onLogout,
+  user
 }) => {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -97,17 +102,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
             })}
           </nav>
 
-          <div className="p-4 mt-auto">
+          <div className="p-4 mt-auto space-y-4">
             <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Status Langganan</p>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-900">Paket Basic</span>
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                  Aktif
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">
+                  {user?.name?.charAt(0) || 'U'}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-900 truncate">{user?.storeName || 'Toko Saya'}</p>
+                  <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+                </div>
+              </div>
+              <button 
+                onClick={onLogout}
+                className="w-full py-2.5 px-4 bg-white hover:bg-red-50 text-red-600 text-xs font-bold rounded-xl border border-slate-200 hover:border-red-100 transition-all flex items-center justify-center gap-2"
+              >
+                <LogOut size={14} />
+                Keluar Aplikasi
+              </button>
+            </div>
+
+            <div className="bg-indigo-600 rounded-2xl p-4 text-white">
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-1 opacity-80">Pelanggan Aktif</p>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-bold">Paket Basic</span>
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-white/20 text-[10px] font-bold">
+                  PRO
                 </span>
               </div>
-              <button className="w-full mt-3 py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition-colors">
-                Upgrade ke Pro
+              <button className="w-full py-2 bg-white text-indigo-600 text-[10px] font-black uppercase rounded-lg transition-transform active:scale-95">
+                Ganti Paket
               </button>
             </div>
           </div>
