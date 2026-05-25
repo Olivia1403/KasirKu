@@ -23,8 +23,10 @@ export default function App() {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
-  const [products, setProducts] = useLocalStorage<Product[]>('kasir_products_v1', INITIAL_PRODUCTS);
-  const [transactions, setTransactions] = useLocalStorage<Transaction[]>('kasir_transactions_v1', []);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [dbStatus, setDbStatus] = useState<any>(null);
+  const [loadingData, setLoadingData] = useState(false);
 
   // Check auth session
   useEffect(() => {
@@ -34,6 +36,41 @@ export default function App() {
     }
     setAuthChecked(true);
   }, []);
+
+  // Sync products and transactions on login
+  const fetchData = useCallback(async () => {
+    setLoadingData(true);
+    try {
+      const [resProducts, resTransactions, resDb] = await Promise.all([
+        fetch('/api/products'),
+        fetch('/api/transactions'),
+        fetch('/api/db-status')
+      ]);
+
+      if (resProducts.ok) {
+        const prodData = await resProducts.json();
+        setProducts(prodData);
+      }
+      if (resTransactions.ok) {
+        const trxData = await resTransactions.json();
+        setTransactions(trxData);
+      }
+      if (resDb.ok) {
+        const dbData = await resDb.json();
+        setDbStatus(dbData);
+      }
+    } catch (err) {
+      console.error('Failed to fetch backend data:', err);
+    } finally {
+      setLoadingData(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  }, [user, fetchData]);
 
   const handleLogin = (userData: any) => {
     setUser(userData);
@@ -51,35 +88,76 @@ export default function App() {
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
   // Handlers
-  const handleCompleteTransaction = useCallback((transaction: Transaction) => {
-    setTransactions(prev => [...prev, transaction]);
-    
-    // Update stock
-    setProducts(prevProducts => {
-      return prevProducts.map(p => {
-        const cartItem = transaction.items.find(item => item.id === p.id);
-        if (cartItem) {
-          return { ...p, stock: Math.max(0, p.stock - cartItem.quantity) };
-        }
-        return p;
+  const handleCompleteTransaction = useCallback(async (transaction: Transaction) => {
+    try {
+      const res = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(transaction)
       });
-    });
+      if (res.ok) {
+        await fetchData();
+        setCurrentView('dashboard');
+      } else {
+        const data = await res.json();
+        alert('Gagal memproses transaksi: ' + (data.error || 'Terjadi kesalahan.'));
+      }
+    } catch (err: any) {
+      alert('Gagal memproses transaksi: ' + err.message);
+    }
+  }, [fetchData]);
 
-    // Notify user (mock)
-    setCurrentView('dashboard');
-  }, [setTransactions, setProducts]);
-
-  const handleAddProduct = (product: Product) => {
-    setProducts(prev => [...prev, product]);
+  const handleAddProduct = async (product: Product) => {
+    try {
+      const res = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(product)
+      });
+      if (res.ok) {
+        await fetchData();
+      } else {
+        const data = await res.json();
+        alert('Gagal menambah produk: ' + (data.error || 'Terjadi kesalahan.'));
+      }
+    } catch (err: any) {
+      alert('Gagal menambah produk: ' + err.message);
+    }
   };
 
-  const handleUpdateProduct = (product: Product) => {
-    setProducts(prev => prev.map(p => p.id === product.id ? product : p));
+  const handleUpdateProduct = async (product: Product) => {
+    try {
+      const res = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(product)
+      });
+      if (res.ok) {
+        await fetchData();
+      } else {
+        const data = await res.json();
+        alert('Gagal memperbarui produk: ' + (data.error || 'Terjadi kesalahan.'));
+      }
+    } catch (err: any) {
+      alert('Gagal memperbarui produk: ' + err.message);
+    }
   };
 
-  const handleDeleteProduct = (id: string) => {
+  const handleDeleteProduct = async (id: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus produk ini?')) {
-      setProducts(prev => prev.filter(p => p.id !== id));
+      try {
+        const res = await fetch(`/api/products/${id}`, {
+          method: 'DELETE'
+        });
+        if (res.ok) {
+          await fetchData();
+        } else {
+          const data = await res.json();
+          alert('Gagal menghapus produk: ' + (data.error || 'Terjadi kesalahan.'));
+        }
+      } catch (err: any) {
+        alert('Gagal menghapus produk: ' + err.message);
+      }
     }
   };
 
@@ -116,9 +194,47 @@ export default function App() {
         return (
           <div className="p-8 max-w-7xl mx-auto space-y-8">
             <h1 className="text-3xl font-bold text-slate-900 mb-2">Pengaturan Toko</h1>
-            <p className="text-slate-500">Kelola profil usaha dan akun Anda.</p>
+            <p className="text-slate-500">Kelola profil usaha, akun, dan integrasi database Anda.</p>
             
-            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Database Diagnostic Status banner */}
+            <div className="p-6 bg-white border border-slate-200 rounded-[24px] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-lg text-slate-900">Status Server Database</h3>
+                  {dbStatus?.connected ? (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 animate-pulse">
+                      MySQL Terhubung
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100">
+                      Fallback Aktif (Tanpa MySQL)
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-slate-500">
+                  {dbStatus?.connected 
+                    ? `Aplikasi ini terhubung langsung ke server database MySQL pada host: ${dbStatus.host}.` 
+                    : `Sistem sedang menggunakan database fallback lokal disk-backup aman (${dbStatus?.databaseName || 'data_fallback.json'}).`}
+                </p>
+                {dbStatus?.error && (
+                  <p className="text-xs text-red-600 font-semibold mt-1">
+                    Detail Log: {dbStatus.error}
+                  </p>
+                )}
+              </div>
+              <div>
+                <button 
+                  onClick={fetchData}
+                  disabled={loadingData}
+                  className="px-4 py-2 bg-indigo-50 text-indigo-600 font-bold text-sm rounded-xl hover:bg-indigo-100 transition-colors flex items-center gap-2"
+                >
+                  {loadingData ? <Loader2 className="animate-spin" size={16} /> : null}
+                  Refresh Koneksi
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="p-8 bg-white rounded-3xl border border-slate-200 shadow-sm">
                 <h3 className="font-bold text-lg mb-6">Profil Usaha</h3>
                 <div className="space-y-4">
@@ -130,33 +246,44 @@ export default function App() {
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">Pemilik</label>
                     <input disabled value={user.name} className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-slate-500 font-medium cursor-not-allowed" />
                   </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">Email Registrasi</label>
+                    <input disabled value={user.email} className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-slate-500 font-medium cursor-not-allowed" />
+                  </div>
                 </div>
               </div>
 
-              <div className="p-8 bg-white rounded-3xl border border-slate-200 shadow-sm">
-                <h3 className="font-bold text-lg mb-6">Sistem & Keamanan</h3>
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
+              <div className="p-8 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                <div>
+                  <h3 className="font-bold text-lg mb-6">Sistem & Keamanan</h3>
+                  <div className="space-y-6">
                     <div>
-                      <p className="font-bold text-slate-900">Cadangkan Data</p>
-                      <p className="text-sm text-slate-500">Simpan salinan data transaksi Anda.</p>
+                      <h4 className="font-bold text-slate-900 mb-1">Cara Hubungkan ke Database MySQL</h4>
+                      <p className="text-sm text-slate-500 leading-relaxed">
+                        Untuk migrasi dari database fallback lokal ke instance MySQL Anda sendiri, silakan tambahkan environment variables berikut di panel konfigurasi Secrets Anda:
+                      </p>
+                      <pre className="mt-2 p-3 bg-slate-50 rounded-xl text-xs font-mono text-slate-600 overflow-x-auto leading-relaxed border border-slate-200">
+                        MYSQL_HOST = host_mysql_anda<br />
+                        MYSQL_PORT = 3306<br />
+                        MYSQL_USER = user_mysql_anda<br />
+                        MYSQL_PASSWORD = password_mysql_anda<br />
+                        MYSQL_DATABASE = nama_database_anda
+                      </pre>
                     </div>
-                    <button className="px-4 py-2 bg-indigo-50 text-indigo-600 font-bold text-sm rounded-xl hover:bg-indigo-100 transition-colors">
-                      Ekspor JSON
-                    </button>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-bold text-red-600">Hapus Sesi</p>
-                      <p className="text-sm text-slate-500">Keluar dari perangkat ini secara aman.</p>
-                    </div>
-                    <button 
-                      onClick={handleLogout}
-                      className="px-4 py-2 bg-red-50 text-red-600 font-bold text-sm rounded-xl hover:bg-red-100 transition-colors"
-                    >
-                      Keluar
-                    </button>
+                </div>
+
+                <div className="flex items-center justify-between pt-6 border-t border-slate-100 mt-6">
+                  <div>
+                    <p className="font-bold text-red-600">Hapus Sesi</p>
+                    <p className="text-sm text-slate-500">Keluar dari perangkat ini secara aman.</p>
                   </div>
+                  <button 
+                    onClick={handleLogout}
+                    className="px-4 py-2 bg-red-50 text-red-600 font-bold text-sm rounded-xl hover:bg-red-100 transition-colors"
+                  >
+                    Keluar Sesi
+                  </button>
                 </div>
               </div>
             </div>

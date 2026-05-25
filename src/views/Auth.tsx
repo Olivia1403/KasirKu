@@ -18,36 +18,36 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     storeName: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    // Simulasi delay proses auth
-    setTimeout(() => {
-      const users = JSON.parse(localStorage.getItem('kasir_users') || '[]');
-      
-      if (isLogin) {
-        const user = users.find((u: any) => u.email === formData.email && u.password === formData.password);
-        if (user) {
-          onLogin(user);
-        } else {
-          setError('Email atau password salah.');
-          setLoading(false);
-        }
-      } else {
-        if (users.find((u: any) => u.email === formData.email)) {
-          setError('Email sudah terdaftar.');
-          setLoading(false);
-          return;
-        }
-        
-        const newUser = { ...formData, id: Date.now().toString() };
-        users.push(newUser);
-        localStorage.setItem('kasir_users', JSON.stringify(users));
-        onLogin(newUser);
+    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+    const payload = isLogin 
+      ? { email: formData.email, password: formData.password }
+      : formData;
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Terjadi kesalahan sistem.');
       }
-    }, 600);
+
+      onLogin(data);
+    } catch (err: any) {
+      console.error('Auth error:', err);
+      setError(err.message || 'Koneksi ke server gagal.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
